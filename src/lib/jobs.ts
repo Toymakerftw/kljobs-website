@@ -347,3 +347,91 @@ export async function fetchJobs(): Promise<{ jobs: Job[]; source: "github" | "sn
   }
   throw new Error("All data sources failed");
 }
+
+export interface FetchProgressiveMeta {
+  source: "github" | "snapshot" | "edge";
+  ts: number;
+}
+
+let fullSyncPromise: Promise<{ jobs: Job[]; source: "github" | "snapshot" }> | null = null;
+
+export function triggerFullSync(): Promise<{ jobs: Job[]; source: "github" | "snapshot" }> {
+  if (!fullSyncPromise) {
+    fullSyncPromise = fetchJobs()
+      .then((res) => {
+        writeCache({ ts: Date.now(), source: res.source, jobs: res.jobs });
+        return res;
+      })
+      .catch((err) => {
+        fullSyncPromise = null; // allow retry on failure
+        throw err;
+      });
+  }
+  return fullSyncPromise;
+}
+
+export function resetFullSync(): void {
+  fullSyncPromise = null;
+}
+
+/**
+ * Phase 1: Fast edge load (~25 KB) for instant first paint
+ * Phase 2: Background full sync from GitHub Raw for descriptions & offline cache
+ */
+export async function fetchJobsProgressive(
+  onInitialSummary: (jobs: Job[], meta?: FetchProgressiveMeta) => void,
+  onFullLoaded: (jobs: Job[], meta?: FetchProgressiveMeta) => void
+): Promise<void> {
+  let initialRendered = false;
+
+  // 1. Try local storage cache first
+  const localCache = readCache();
+  if (localCache) {
+    onInitialSummary(localCache.jobs, { source: localCache.source, ts: localCache.ts });
+    initialRendered = true;
+  }
+
+  // 2. Fetch fast Edge-cached summary if no local cache or stale
+  if (!localCache) {
+    try {
+      const edgeRes = await fetch("/api/jobs", { cache: "default" });
+      if (edgeRes.ok) {
+        const data = await edgeRes.json();
+        if (data.jobs?.length) {
+          onInitialSummary(data.jobs, { source: "edge", ts: data.ts || Date.now() });
+          initialRendered = true;
+        }
+      }
+    } catch {
+      // Fallback to direct snapshot if edge fails
+    }
+  }
+
+  // 3. Defer full payload sync to browser idle time (or immediately if initial summary failed)
+  const runSync = async () => {
+    try {
+      const { jobs, source } = await triggerFullSync();
+      onFullLoaded(jobs, { source, ts: Date.now() });
+    } catch (err) {
+      if (!initialRendered) {
+        throw err;
+      }
+      // Ignore background sync errors if initial render already succeeded
+    }
+  };
+
+  if (!initialRendered) {
+    // If neither local cache nor edge summary worked, sync immediately without deferring
+    await runSync();
+  } else {
+    const scheduleSync =
+      typeof window !== "undefined" && "requestIdleCallback" in window
+        ? window.requestIdleCallback
+        : (cb: () => void) => setTimeout(cb, 1000);
+
+    scheduleSync(() => {
+      runSync().catch(() => {});
+    });
+  }
+}
+

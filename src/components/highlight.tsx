@@ -10,7 +10,8 @@ function escapeRegExp(s: string): string {
  * Highlights occurrences of the (whitespace-split) query inside text.
  * Renders <mark> for matches; plain text otherwise.
  */
-export function Highlight({ text, query }: { text: string; query: string }) {
+export function Highlight({ text = "", query }: { text?: string; query: string }) {
+  if (!text) return null;
   const terms = query
     .trim()
     .split(/\s+/)

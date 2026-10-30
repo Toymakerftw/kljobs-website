@@ -12,6 +12,7 @@ import {
   GraduationCap,
   Mail,
   MapPin,
+  RotateCw,
   Share2,
   Sparkles,
   X,
@@ -19,6 +20,7 @@ import {
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 import type { Job } from "@/lib/types";
@@ -245,9 +247,27 @@ export function JobDetailSheet({
             <h4 className="mb-2 text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">
               Full description
             </h4>
-            <p className="whitespace-pre-wrap break-words text-[13.5px] leading-relaxed text-foreground/90">
-              <Highlight text={job.description} query={query} />
-            </p>
+            {job.description ? (
+              <p className="whitespace-pre-wrap break-words text-[13.5px] leading-relaxed text-foreground/90">
+                <Highlight text={job.description} query={query} />
+              </p>
+            ) : job.hasDescription !== false ? (
+              <div className="space-y-2 py-2" aria-label="Loading description">
+                <div className="flex items-center gap-2 text-[12px] text-muted-foreground mb-3">
+                  <RotateCw className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                  <span>Loading full description…</span>
+                </div>
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-5/6" />
+                <Skeleton className="h-4 w-4/6" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-3/4" />
+              </div>
+            ) : (
+              <p className="text-[13.5px] italic text-muted-foreground">
+                No detailed description provided in the original listing.
+              </p>
+            )}
           </section>
 
           <Separator className="my-4" />

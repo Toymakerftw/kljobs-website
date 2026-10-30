@@ -20,10 +20,10 @@ import { FilterSheet } from "@/components/filter-sheet";
 import { useToast } from "@/hooks/use-toast";
 import {
   DATA_URLS,
-  fetchJobs,
-  readCache,
+  fetchJobsProgressive,
+  resetFullSync,
   timeAgo,
-  writeCache,
+  triggerFullSync,
 } from "@/lib/jobs";
 import { DEFAULT_PREFS, useAppliedJobs, useDebounced, useHydrated, usePrefs, useSavedJobs } from "@/lib/storage";
 import type { Job, TabKey } from "@/lib/types";
@@ -47,7 +47,7 @@ export default function Home() {
 
   /* ---------------- data ---------------- */
   const [jobs, setJobs] = useState<Job[] | null>(null);
-  const [source, setSource] = useState<"github" | "snapshot" | null>(null);
+  const [source, setSource] = useState<"github" | "snapshot" | "edge" | null>(null);
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -55,13 +55,13 @@ export default function Home() {
 
   const load = useCallback(async (isInitial: boolean) => {
     setRefreshing(true);
+    resetFullSync();
     try {
-      const { jobs: fresh, source: src } = await fetchJobs();
+      const { jobs: fresh, source: src } = await triggerFullSync();
       setJobs(fresh);
       setSource(src);
       setLastUpdated(Date.now());
       setFailed(false);
-      writeCache({ ts: Date.now(), source: src, jobs: fresh });
     } catch {
       if (isInitial) setFailed(true);
       else toast({ title: "Couldn't refresh", description: "Showing the last saved copy.", variant: "destructive" });
@@ -71,18 +71,26 @@ export default function Home() {
   }, [toast]);
 
   useEffect(() => {
-    const cached = readCache();
-    if (cached) {
-      setJobs(cached.jobs);
-      setSource(cached.source);
-      setLastUpdated(cached.ts);
-      load(false);
-    } else {
-      load(true);
-    }
+    fetchJobsProgressive(
+      (initialJobs, meta) => {
+        setJobs(initialJobs);
+        if (meta?.source) setSource(meta.source);
+        if (meta?.ts) setLastUpdated(meta.ts);
+        setFailed(false);
+      },
+      (fullJobs, meta) => {
+        setJobs(fullJobs);
+        if (meta?.source) setSource(meta.source);
+        if (meta?.ts) setLastUpdated(meta.ts);
+        setFailed(false);
+      }
+    ).catch(() => {
+      setFailed(true);
+    });
+
     const t = setInterval(() => setTick((x) => x + 1), 60_000);
     return () => clearInterval(t);
-  }, [load]);
+  }, []);
 
   /* ---------------- user state (browser storage) ---------------- */
   const [savedIds, toggleSaved] = useSavedJobs();
@@ -96,6 +104,19 @@ export default function Home() {
   const [tab, setTab] = useState<TabKey>("all");
   const [filterOpen, setFilterOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const handleOpenJob = useCallback((job: Job) => {
+    setSelectedId(job.id);
+    if (!job.description && job.hasDescription !== false) {
+      triggerFullSync()
+        .then((res) => {
+          setJobs(res.jobs);
+          setSource(res.source);
+          setLastUpdated(Date.now());
+        })
+        .catch(() => {});
+    }
+  }, []);
 
   const savedSet = useMemo(() => new Set(savedIds), [savedIds]);
   const appliedSet = useMemo(() => new Set(Object.keys(appliedMap)), [appliedMap]);
@@ -194,7 +215,7 @@ export default function Home() {
       );
     }
 
-    if (failed && jobs.length === 0) {
+    if (failed && (!jobs || jobs.length === 0)) {
       return (
         <div className="flex flex-col items-center gap-3 py-16 text-center">
           <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted">
@@ -262,7 +283,7 @@ export default function Home() {
               applied={appliedSet.has(job.id)}
               query={dq}
               onToggleSave={toggleSaved}
-              onOpen={(j) => setSelectedId(j.id)}
+              onOpen={handleOpenJob}
             />
           ))}
         </div>

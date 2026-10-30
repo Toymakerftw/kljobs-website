@@ -28,7 +28,8 @@ export interface Job {
   title: string;
   company: string;
   park: string;
-  description: string;
+  description?: string;
+  hasDescription?: boolean;
   email: string;
   extraEmails: string[];
   link: string;
@@ -60,6 +61,6 @@ export interface Prefs {
 
 export interface CacheData {
   ts: number;
-  source: "github" | "snapshot";
+  source: "github" | "snapshot" | "edge";
   jobs: Job[];
 }
