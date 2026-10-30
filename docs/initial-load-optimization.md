@@ -163,20 +163,20 @@ export async function fetchJobsProgressive(
 
 ### Step 3: Edge Pre-Warming via Vercel Cron (`vercel.json`)
 
-To prevent cold cache misses after the 6-hour TTL, add `vercel.json` in the project root:
+To prevent cold cache misses, add `vercel.json` in the project root. On Vercel Hobby accounts, cron jobs are limited to once per day (e.g. `0 0 * * *` at 00:00 UTC / 05:30 AM IST):
 
 ```json
 {
   "crons": [
     {
       "path": "/api/jobs",
-      "schedule": "0 */6 * * *"
+      "schedule": "0 0 * * *"
     }
   ]
 }
 ```
 
-*Note: Vercel Cron Jobs are supported on Vercel Hobby (1 cron job per project) and Pro plans.*
+*Note: Vercel Cron Jobs on the Hobby plan are limited to running at most once a day (`0 0 * * *`). Pro plans support more frequent intervals such as `0 */6 * * *`.*
 
 ---
 
