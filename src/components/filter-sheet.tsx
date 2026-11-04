@@ -1,6 +1,6 @@
 "use client";
 
-import { SlidersHorizontal } from "lucide-react";
+import { SlidersHorizontal, X } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -39,9 +39,19 @@ export function FilterSheet({
         <div className="shrink-0 border-b px-5 pb-4 pt-2">
           <div className="mx-auto mb-1 h-1 w-10 rounded-full bg-muted-foreground/25 md:hidden" aria-hidden />
           <SheetHeader className="p-0 text-left">
-            <SheetTitle className="flex items-center gap-2 text-base">
-              <SlidersHorizontal className="h-4 w-4" aria-hidden /> More filters
-            </SheetTitle>
+            <div className="flex items-start justify-between gap-2">
+              <SheetTitle className="flex items-center gap-2 text-base">
+                <SlidersHorizontal className="h-4 w-4" aria-hidden /> More filters
+              </SheetTitle>
+              <button
+                type="button"
+                aria-label="Close filters"
+                onClick={() => onOpenChange(false)}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted"
+              >
+                <X className="h-5 w-5" aria-hidden />
+              </button>
+            </div>
             <SheetDescription className="text-[13px]">Sorting and visibility options</SheetDescription>
           </SheetHeader>
         </div>
